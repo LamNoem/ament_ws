@@ -11,7 +11,23 @@
 
 class EstimationNode : public rclcpp::Node {
   public:
+    // Constants
+    Matrix3d C_li;
+    Vector3d t_i_li;
+    double var_imu_f, var_imu_w, var_gnss, var_lidar;
+    Vector3d g;
+    MatrixXd l_jac, h_jac;
+
+    // State Variables
+    map<string, MatrixXd> data;
+    MatrixXd p_est, v_est, q_est;
+    vector<MatrixXd> p_cov;
+    vector<double> gnss_t, lidar_t;
+
+    
     EstimationNode();
+
+    void mainLoop();
 
     // Timer callback to publish a test message
     void publishMessage();
@@ -20,7 +36,7 @@ class EstimationNode : public rclcpp::Node {
     void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan);
 
    
-    measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check);
+    tuple<Vector3d, Vector3d, Quaternion, MatrixXd> measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check);
 
 
     // Callback function to handle imu messages

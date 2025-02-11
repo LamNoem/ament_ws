@@ -62,9 +62,9 @@ int main() {
     vector<MatrixXd> p_cov(data_size, MatrixXd::Zero(9, 9));
 
     // Set initial values
-    p_est.row(0) = gt.row(0).head(3);
-    v_est.row(0) = gt.row(0).segment(3, 3);
-    q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy();
+    p_est.row(0) = gt.row(0).head(3); //these r arbitrary
+    v_est.row(0) = gt.row(0).segment(3, 3); //these r arbitrary
+    q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy(); // these r arbitrary
     p_cov[0] = MatrixXd::Zero(9, 9);
 
     vector<double> gnss_t(gnss.rows());
