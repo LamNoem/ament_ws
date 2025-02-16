@@ -6,6 +6,8 @@
 
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "sensor_msgs/msg/imu.hpp" //added imu header
+
 
 #include "estimation_core.hpp"
 
@@ -15,6 +17,8 @@
 #include <iostream>
 #include <fstream>
 
+
+#include <map> //i think u use map 
 
 class EstimationNode : public rclcpp::Node {
   public:

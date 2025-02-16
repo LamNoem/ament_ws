@@ -58,7 +58,12 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
 
         h_jac = MatrixXd::Zero(3, 9);
         h_jac.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3);
-
+        
+        //allocated space for the state variables : 
+        p_est = MatrixXd::Zero(10000, 3);
+        v_est = MatrixXd::Zero(10000, 3);
+        q_est = MatrixXd::Zero(10000, 4);
+        p_cov.resize(10000, MatrixXd::Zero(9, 9));
 //   // Initialize costmap parameters
 //   resolution_ = 0.1; // 0.1 meters per cell
 //   width_ = 100;      // 10 meters
@@ -72,50 +77,43 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
 
 // Callback function to handle incoming IMU messages
 void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
-    // Extract and log orientation data
-    RCLCPP_INFO(this->get_logger(), "Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f",
-                msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
+    // converts ROS quaternion to Eigen Quaternion
+    Eigen::Quaterniond imu_orientation(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+    q_est.row(0) = imu_orientation.coeffs();  // store in q_est
 
-    // Extract and log angular velocity data
-    RCLCPP_INFO(this->get_logger(), "Angular Velocity -> x: %.2f, y: %.2f, z: %.2f",
-                msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+    // extract linear acceleration
+    Eigen::Vector3d imu_accel(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
 
-    // Extract and log linear acceleration data
-    RCLCPP_INFO(this->get_logger(), "Linear Acceleration -> x: %.2f, y: %.2f, z: %.2f",
-                msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+    // inegrate acceleration to update velocity (100hz updates, idk how fast the clock is might be cnaged later)
+    v_est.row(0) += imu_accel.transpose() * 0.01;
+
+    // log transformed data
+    RCLCPP_INFO(this->get_logger(), "Updated IMU Data -> Velocity: [%.2f, %.2f, %.2f]",
+                v_est(0,0), v_est(0,1), v_est(0,2));
 }
-
 
 
 void EstimationNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
  
-  // from costmap
-  for (size_t i = 0; i < scan->ranges.size(); ++i) {
-    double angle = scan->angle_min + i * scan->angle_increment;
-    double range = scan->ranges[i];
-    if (range > scan->range_min && range < scan->range_max) {
-      int x_grid, y_grid;
-      
-    }
-  }
+    if (msg->ranges.empty()) return;
 
-  // Log the angle and range data
-    RCLCPP_INFO(this->get_logger(), "LaserScan Info:");
-    RCLCPP_INFO(this->get_logger(), "  Angle Min: %.2f rad, Angle Max: %.2f rad", msg->angle_min, msg->angle_max);
-    RCLCPP_INFO(this->get_logger(), "  Angle Increment: %.2f rad", msg->angle_increment);
-    RCLCPP_INFO(this->get_logger(), "  Time Increment: %.6f sec", msg->time_increment);
-    RCLCPP_INFO(this->get_logger(), "  Scan Time: %.6f sec", msg->scan_time);
-    RCLCPP_INFO(this->get_logger(), "  Range Min: %.2f m, Range Max: %.2f m", msg->range_min, msg->range_max);
+    // get 1st LIDAR measurement (assume closest)?
+    double angle = msg->angle_min;
+    double range = msg->ranges[0];
 
-    // Process range data (e.g., find the minimum range)
-    float min_range = std::numeric_limits<float>::infinity();
-    float max_range = -std::numeric_limits<float>::infinity();
-    for (const auto &range : msg->ranges) {
-        if (range < min_range) min_range = range;
-        if (range > max_range) max_range = range;
-    }
+    // cinvert to careteseian coordinates (LIDAR frame)
+    Eigen::Vector3d lidar_point(range * cos(angle), range * sin(angle), 0.0);
 
-    RCLCPP_INFO(this->get_logger(), "  Min Range: %.2f m, Max Range: %.2f m", min_range, max_range);
+    // transform LIDAR to IMU frame
+    Eigen::Vector3d imu_position = (C_li * lidar_point) + t_i_li;
+    
+    // store updated position
+    p_est.row(0) = imu_position.transpose();
+
+    // log the transform
+    RCLCPP_INFO(this->get_logger(), "Transformed LIDAR Position -> [%.2f, %.2f, %.2f]",
+                imu_position.x(), imu_position.y(), imu_position.z());
+
 
 }
 
