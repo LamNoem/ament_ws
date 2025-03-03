@@ -39,6 +39,8 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
         "/imu/data",  // Change this to the name of your IMU topic
          10,  // Queue size
          std::bind(&IEstimationNode::imuCallback, this, std::placeholders::_1)
+
+  estimation_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/estimation", 10);
     );
 
   // Initialize constants
@@ -135,8 +137,10 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
         MatrixXd p_cov_hat = (MatrixXd::Identity(9, 9) - k_gain * h_jac) * p_cov_check;
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
 }
-// Noemie: must be changed to handle actual data structure from inputs
+// Noemie and sania: must be changed to handle actual data structure from inputs
+// e.g what is imu_f according to the repositry and what is our equivalent datastructure.
 void EstimationNode::mainLoop() {
+        //this has to change i think to get our actual data
         auto gt = data["gt"];
         auto imu_f = data["imu_f"];
         auto imu_w = data["imu_w"];
@@ -144,14 +148,18 @@ void EstimationNode::mainLoop() {
         auto lidar = data["lidar"];
 
         // Set initial values
+        //i think this has to change to fit our actual data structure
         p_est.row(0) = gt.row(0).head(3);
         v_est.row(0) = gt.row(0).segment(3, 3);
         q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy();
         p_cov[0] = MatrixXd::Zero(9, 9);
 
+        //depending on the changs made above, the function below may need to change
+
         for (int k = 1; k < imu_f.rows(); ++k) {
             double delta_t = imu_f(k, 0) - imu_f(k - 1, 0);
-
+          //PREDICTION
+          //Update state with IMU inputs
             Quaternion q_prev(q_est.row(k - 1));
             Quaternion q_curr(imu_w.row(k - 1) * delta_t);
             Matrix3d c_ns = q_prev.to_mat();
@@ -166,13 +174,14 @@ void EstimationNode::mainLoop() {
             MatrixXd f_jac = MatrixXd::Identity(9, 9);
             f_jac.block<3, 3>(0, 3) = MatrixXd::Identity(3, 3) * delta_t;
             f_jac.block<3, 3>(3, 6) = -skew_symmetric(c_ns * imu_f.row(k - 1).transpose()) * delta_t;
-
+          // propogate uncertainty
             MatrixXd q_cov = MatrixXd::Zero(6, 6);
             q_cov.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * delta_t * delta_t * var_imu_f;
             q_cov.block<3, 3>(3, 3) = MatrixXd::Identity(3, 3) * delta_t * delta_t * var_imu_w;
 
             MatrixXd p_cov_check = f_jac * p_cov[k - 1] * f_jac.transpose() + l_jac * q_cov * l_jac.transpose();
 
+            //CORRECTION
             // GNSS and LIDAR updates
             if (find(gnss_t.begin(), gnss_t.end(), imu_f(k, 0)) != gnss_t.end()) {
                 int gnss_i = distance(gnss_t.begin(), find(gnss_t.begin(), gnss_t.end(), imu_f(k, 0)));
@@ -202,6 +211,27 @@ void EstimationNode::publishMessage() {
   message.data = "Hello, ROS 2!";
   RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
   string_pub_->publish(message);
+}
+
+//not sure this'll work its just a first try
+void EstimationNode::publishMessage(const Vector3d &p_hat, const Vector3d &v_hat, const Quaternion &q_hat) {
+  auto message = nav_msgs::msg::Odometry();
+  
+  message.pose.pose.position.x = p_hat.x();
+  message.pose.pose.position.y = p_hat.y();
+  message.pose.pose.position.z = p_hat.z();
+
+  message.pose.pose.orientation.x = q_hat.x;
+  message.pose.pose.orientation.y = q_hat.y;
+  message.pose.pose.orientation.z = q_hat.z;
+  message.pose.pose.orientation.w = q_hat.w;
+
+  message.twist.twist.linear.x = v_hat.x();
+  message.twist.twist.linear.y = v_hat.y();
+  message.twist.twist.linear.z = v_hat.z();
+  
+  RCLCPP_INFO(this->get_logger(), "Publishing estimation data (Pose & Velocity).");
+  estimation_pub_->publish(message);
 }
 
 int main(int argc, char ** argv)
