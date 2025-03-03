@@ -64,6 +64,8 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
         //allocated space for the state variables : 
         p_est = MatrixXd::Zero(10000, 3);
         v_est = MatrixXd::Zero(10000, 3);
+        imu_w = MatrixXd::Zero(10000, 3);
+        imu_f = MatrixXd::Zero(10000, 3);
         q_est = MatrixXd::Zero(10000, 4);
         p_cov.resize(10000, MatrixXd::Zero(9, 9));
 //   // Initialize costmap parameters
@@ -76,8 +78,9 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
 //   initializeCostmap();
 }
 
-
+//need angular velocity to replace imu_w
 // Callback function to handle incoming IMU messages
+//assumptions: imu at centre of mass, and perfectly level.
 void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     // converts ROS quaternion to Eigen Quaternion
     Eigen::Quaterniond imu_orientation(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
@@ -92,6 +95,14 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     // log transformed data
     RCLCPP_INFO(this->get_logger(), "Updated IMU Data -> Velocity: [%.2f, %.2f, %.2f]",
                 v_est(0,0), v_est(0,1), v_est(0,2));
+
+                // extract linear acceleration, remove g from z, mulitply by mass.
+    imu_f.row(0) = m * imu_accel.coeefs();
+    Eigen::Vector3d imu_angular(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+    imu_w.row(0) = imu_angular.coeffs();
+
+
+
 }
 
 
@@ -141,22 +152,26 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
 // e.g what is imu_f according to the repositry and what is our equivalent datastructure.
 void EstimationNode::mainLoop() {
         //this has to change i think to get our actual data
-        auto gt = data["gt"];
-        auto imu_f = data["imu_f"];
-        auto imu_w = data["imu_w"];
-        auto gnss = data["gnss"];
-        auto lidar = data["lidar"];
+        // auto gt = data["gt"];
+        // auto imu_f = data["imu_f"];
+        // auto imu_w = data["imu_w"];
+        // auto gnss = data["gnss"];
+        // auto lidar = data["lidar"];
 
-        // Set initial values
-        //i think this has to change to fit our actual data structure
-        p_est.row(0) = gt.row(0).head(3);
-        v_est.row(0) = gt.row(0).segment(3, 3);
-        q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy();
-        p_cov[0] = MatrixXd::Zero(9, 9);
+        // // Set initial values
+        // //i think this has to change to fit our actual data structure
+        // p_est.row(0) = gt.row(0).head(3);
+        // v_est.row(0) = gt.row(0).segment(3, 3);
+        // q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy();
+        // p_cov[0] = MatrixXd::Zero(9, 9);
 
         //depending on the changs made above, the function below may need to change
 
+        //thoughts:
+        //we need two vector variables for imuw imuf vest qest pest
+        //they will refect past and current, after each loop past becomes current, then we get new data
         for (int k = 1; k < imu_f.rows(); ++k) {
+          //we need the actual change in time from clock
             double delta_t = imu_f(k, 0) - imu_f(k - 1, 0);
           //PREDICTION
           //Update state with IMU inputs

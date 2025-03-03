@@ -31,7 +31,7 @@ class EstimationNode : public rclcpp::Node {
 
     // State Variables
     map<string, MatrixXd> data;
-    MatrixXd p_est, v_est, q_est;
+    MatrixXd p_est, v_est, q_est, imu_w, imu_f;
     vector<MatrixXd> p_cov;
     vector<double> gnss_t, lidar_t;
 
