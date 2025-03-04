@@ -146,6 +146,10 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
         Quaternion q_hat = Quaternion(error_state.tail(3)).quat_mult_left(q_check);
 
         MatrixXd p_cov_hat = (MatrixXd::Identity(9, 9) - k_gain * h_jac) * p_cov_check;
+
+
+        publishMessage(p_hat, v_hat, q_hat);
+
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
 }
 // Noemie and sania: must be changed to handle actual data structure from inputs
@@ -167,12 +171,18 @@ void EstimationNode::mainLoop() {
 
         //depending on the changs made above, the function below may need to change
 
+        rclcpp::Time last_time = this->now();  // Store initial time
+
         //thoughts:
         //we need two vector variables for imuw imuf vest qest pest
         //they will refect past and current, after each loop past becomes current, then we get new data
         for (int k = 1; k < imu_f.rows(); ++k) {
           //we need the actual change in time from clock
-            double delta_t = imu_f(k, 0) - imu_f(k - 1, 0);
+            //double delta_t = imu_f(k, 0) - imu_f(k - 1, 0);
+
+            rclcpp::Time current_time = this->now();
+            double delta_t = (current_time - last_time).seconds(); // Compute Δt
+            last_time = current_time; // Update last time
           //PREDICTION
           //Update state with IMU inputs
             Quaternion q_prev(q_est.row(k - 1));
