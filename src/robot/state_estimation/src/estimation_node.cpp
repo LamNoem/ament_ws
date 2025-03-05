@@ -164,9 +164,9 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
         //shouldnt/why arent these values going into the "est" values after a measurement update
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
 }
-// Noemie and sania: must be changed to handle actual data structure from inputs
-// e.g what is imu_f according to the repositry and what is our equivalent datastructure.
 
+
+//I THINK RESTRUCTURE NEEDED
 //Note: delta t now comes from call back functions NB: doesnt need to come from lasercallback (since only used for measurement update)
 //Now we need to define then and now variables in our class,
 //this main loop function will be editted to have parameters,
@@ -178,7 +178,7 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
 //for this we would need the "check" and "est" values to have class variables 
 
 //while main loop is called from imucallback
-// and imuw and imuf have past and current class variables.
+//and imuw and imuf have past and current class variables.
 
 //pretty sure we dont need vest from imu and pest from lasercall back
 //measurement update results in updated "est" values, which uses i think distance from lidar and "check" values
