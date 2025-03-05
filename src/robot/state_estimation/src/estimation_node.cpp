@@ -68,20 +68,24 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
         imu_f = MatrixXd::Zero(10000, 3);
         q_est = MatrixXd::Zero(10000, 4);
         p_cov.resize(10000, MatrixXd::Zero(9, 9));
-//   // Initialize costmap parameters
-//   resolution_ = 0.1; // 0.1 meters per cell
-//   width_ = 100;      // 10 meters
-//   height_ = 100;     // 10 meters
-//   origin_x_ = 0; 
-//   origin_y_ = 0; 
 
-//   initializeCostmap();
 }
 
 //need angular velocity to replace imu_w
 // Callback function to handle incoming IMU messages
 //assumptions: imu at centre of mass, and perfectly level.
 void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
+    //diff in time between messages
+    rclcpp::Time current_time = this->now(); // Get current ROS time
+
+    // i dont think this is necessary
+    // if (last_time_.nanoseconds() == 0) {
+    //     last_time_ = current_time; // Set first received time
+    // }
+
+    double delta_t = (current_time - last_time_).nanoseconds() / 1.0e6; // Δt in milliseconds
+    last_time_ = current_time; // Update last received time
+
     // converts ROS quaternion to Eigen Quaternion
     Eigen::Quaterniond imu_orientation(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
     q_est.row(0) = imu_orientation.coeffs();  // store in q_est
@@ -109,6 +113,13 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
 void EstimationNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
  
     if (msg->ranges.empty()) return;
+
+    //diff in time between messages
+    rclcpp::Time current_time = this->now(); // Get current ROS time
+
+
+    double delta_t = (current_time - last_time_).nanoseconds() / 1.0e6; // Δt in milliseconds
+    last_time_ = current_time; // Update last received time
 
     // get 1st LIDAR measurement (assume closest)?
     double angle = msg->angle_min;
@@ -149,40 +160,37 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
 
 
         publishMessage(p_hat, v_hat, q_hat);
-
+        // i think we should return this in the publisher
+        //shouldnt/why arent these values going into the "est" values after a measurement update
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
 }
 // Noemie and sania: must be changed to handle actual data structure from inputs
 // e.g what is imu_f according to the repositry and what is our equivalent datastructure.
+
+//Note: delta t now comes from call back functions NB: doesnt need to come from lasercallback (since only used for measurement update)
+//Now we need to define then and now variables in our class,
+//this main loop function will be editted to have parameters,
+//i think the parameters will be delta t, and the then and now variables (for imuw, imuf, vest, qest, pest and such)
+
+//pest, vest, qest, pcov are only updated after measurement update + lidar if u look at github
+//lidar is only used for measurment update
+// so i think measurement update should be called from lasercallback
+//for this we would need the "check" and "est" values to have class variables 
+
+//while main loop is called from imucallback
+// and imuw and imuf have past and current class variables.
+
+//pretty sure we dont need vest from imu and pest from lasercall back
+//measurement update results in updated "est" values, which uses i think distance from lidar and "check" values
+
+//where "check" values are predicted, "hat" values are corrected, "est" values are current state
 void EstimationNode::mainLoop() {
-        //this has to change i think to get our actual data
-        // auto gt = data["gt"];
-        // auto imu_f = data["imu_f"];
-        // auto imu_w = data["imu_w"];
-        // auto gnss = data["gnss"];
-        // auto lidar = data["lidar"];
-
-        // // Set initial values
-        // //i think this has to change to fit our actual data structure
-        // p_est.row(0) = gt.row(0).head(3);
-        // v_est.row(0) = gt.row(0).segment(3, 3);
-        // q_est.row(0) = Quaternion(gt.row(0).segment(6, 3)).to_numpy();
-        // p_cov[0] = MatrixXd::Zero(9, 9);
-
-        //depending on the changs made above, the function below may need to change
-
-        rclcpp::Time last_time = this->now();  // Store initial time
-
-        //thoughts:
+        
         //we need two vector variables for imuw imuf vest qest pest
         //they will refect past and current, after each loop past becomes current, then we get new data
+        // for everytime we get sensor data
         for (int k = 1; k < imu_f.rows(); ++k) {
-          //we need the actual change in time from clock
-            //double delta_t = imu_f(k, 0) - imu_f(k - 1, 0);
-
-            rclcpp::Time current_time = this->now();
-            double delta_t = (current_time - last_time).seconds(); // Compute Δt
-            last_time = current_time; // Update last time
+          
           //PREDICTION
           //Update state with IMU inputs
             Quaternion q_prev(q_est.row(k - 1));
@@ -207,6 +215,7 @@ void EstimationNode::mainLoop() {
             MatrixXd p_cov_check = f_jac * p_cov[k - 1] * f_jac.transpose() + l_jac * q_cov * l_jac.transpose();
 
             //CORRECTION
+            // think this is unecessary if we call measurement update in lasercallback
             // GNSS and LIDAR updates
             if (find(gnss_t.begin(), gnss_t.end(), imu_f(k, 0)) != gnss_t.end()) {
                 int gnss_i = distance(gnss_t.begin(), find(gnss_t.begin(), gnss_t.end(), imu_f(k, 0)));
@@ -221,6 +230,7 @@ void EstimationNode::mainLoop() {
             }
 
             // Update states
+            //why is it check instead of hat values
             p_est.row(k) = p_check.transpose();
             v_est.row(k) = v_check.transpose();
             q_est.row(k) = q_check.to_numpy();

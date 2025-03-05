@@ -55,8 +55,10 @@ class EstimationNode : public rclcpp::Node {
 
 
   private:
+    rclcpp::Time last_time_{0};
 
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr estimation_pub_;
+
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr estimation_pub_;
 
     // Core costmap object
     robot::EstimationCore estimation_;
