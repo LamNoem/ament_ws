@@ -189,6 +189,7 @@ void EstimationNode::mainLoop() {
         //we need two vector variables for imuw imuf vest qest pest
         //they will refect past and current, after each loop past becomes current, then we get new data
         // for everytime we get sensor data
+        //so this for loop is replaced by placing it in imucallback
         for (int k = 1; k < imu_f.rows(); ++k) {
           
           //PREDICTION
