@@ -105,6 +105,8 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     Eigen::Vector3d imu_angular(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
     imu_w.row(0) = imu_angular.coeffs();
 
+    mainLoop(p_est, v_est, ); 
+
 
 
 }
@@ -133,6 +135,9 @@ void EstimationNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
     
     // store updated position
     p_est.row(0) = imu_position.transpose();
+    
+    //sensor var ??
+    measurementUpdate(sensor_var, p_cov_check, y_k, p_check, v_check, q_check);
 
     // log the transform
     RCLCPP_INFO(this->get_logger(), "Transformed LIDAR Position -> [%.2f, %.2f, %.2f]",
