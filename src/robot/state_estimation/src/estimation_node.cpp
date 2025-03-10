@@ -105,7 +105,12 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     Eigen::Vector3d imu_angular(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
     imu_w.row(0) = imu_angular.coeffs();
 
-    mainLoop(p_est, v_est, ); 
+    //(for imuw, imuf, vest, qest, pest and such)
+
+    mainLoop( delta_t, p_est, v_est, q_est, imu_w, imu_f, p_cov); 
+
+    //make class variables for these inputs, except delta t
+    // pretty sure only imu_w and imu_f need before and after
 
 
 
