@@ -181,7 +181,7 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
         // v_est.row(k) = v_hat;
         // q_est.row(k) = q_hat;
         // p_cov[k] = p_cov_hat;
-        
+
         // i think we should return this in the publisher
         //shouldnt/why arent these values going into the "est" values after a measurement update
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
@@ -216,8 +216,9 @@ void EstimationNode::MotionModel() {
           
           //PREDICTION
           //Update state with IMU inputs
-          // q.. only need one variable since the past variable is used to predict the next/current one
-          //imuf_w need past and current values.
+          //SANIA: 
+          // q.. variable only need one variable since the past variable is used to predict the next/current one
+          //imuf & imu_w need past and current values.
             Quaternion q_prev(q_est.row(k - 1));
             Quaternion q_curr(imu_w.row(k - 1) * delta_t);
             Matrix3d c_ns = q_prev.to_mat();
