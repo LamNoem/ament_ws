@@ -1,6 +1,11 @@
-//SANIA: 
-q.. variable only need one variable since the past variable is used to predict the next/current one.
+left to do: <br />
 
-
+implement measurement update in lasercall back
 <br />
-imuf & imu_w need past and current values variables
+fix publisher
+<br />
+decide the timing and scenario of motion model / prediction and measurementupdate/correction
+<br />
+check that my implementation isnt wrong
+<br />
+test in simulation
