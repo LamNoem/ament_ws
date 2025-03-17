@@ -62,12 +62,16 @@ EstimationNode::EstimationNode() : Node("estimation"), estimation_(robot::Estima
         h_jac.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3);
         
         //allocated space for the state variables : 
-        p_est = MatrixXd::Zero(10000, 3);
-        v_est = MatrixXd::Zero(10000, 3);
-        imu_w = MatrixXd::Zero(10000, 3);
-        imu_f = MatrixXd::Zero(10000, 3);
-        q_est = MatrixXd::Zero(10000, 4);
-        p_cov.resize(10000, MatrixXd::Zero(9, 9));
+        // Define IMU state variables as global variables
+        Eigen::Vector3d p_est = Eigen::Vector3d::Zero();   // Position [x, y, z]
+        Eigen::Vector3d v_est = Eigen::Vector3d::Zero();   // Velocity [vx, vy, vz]
+        Eigen::Quaterniond q_est = Eigen::Quaterniond::Identity(); // Orientation (quaternion)
+        Eigen::Matrix<double, 9, 9> p_cov = Eigen::Matrix<double, 9, 9>::Zero(); // 9x9 Position and velocity covariance matrix
+        Eigen::Vector3d imu_w = Eigen::Vector3d::Zero();   // Angular velocity [wx, wy, wz]
+        Eigen::Vector3d imu_f = Eigen::Vector3d::Zero();   // Linear acceleration [fx, fy, fz]
+
+        Eigen::Vector3d imu_w_past = Eigen::Vector3d::Zero();   // Angular velocity [wx, wy, wz]
+        Eigen::Vector3d imu_f_past = Eigen::Vector3d::Zero();   // Linear acceleration [fx, fy, fz]
 
 }
 
@@ -86,37 +90,55 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
     double delta_t = (current_time - last_time_).nanoseconds() / 1.0e6; // Δt in milliseconds
     last_time_ = current_time; // Update last received time
 
-    // converts ROS quaternion to Eigen Quaternion
-    Eigen::Quaterniond imu_orientation(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
-    q_est.row(0) = imu_orientation.coeffs();  // store in q_est
+    // Store individual components of angular velocity (imu_w_)
+    imu_w << msg->angular_velocity.x, 
+               msg->angular_velocity.y, 
+               msg->angular_velocity.z;
 
-    // extract linear acceleration
-    Eigen::Vector3d imu_accel(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+    // Store individual components of linear acceleration (imu_f_)
+    imu_f << msg->linear_acceleration.x, 
+              msg->linear_acceleration.y, 
+              msg->linear_acceleration.z;
 
-    // inegrate acceleration to update velocity (100hz updates, idk how fast the clock is might be cnaged later)
-    v_est.row(0) += imu_accel.transpose() * 0.01;
+    // Compute magnitudes for angular velocity (w) and linear acceleration (f)
+    double w_magnitude = imu_w.norm(); // Euclidean norm of angular velocity
+    double f_magnitude = imu_f.norm(); // Euclidean norm of linear acceleration
 
-    // log transformed data
-    RCLCPP_INFO(this->get_logger(), "Updated IMU Data -> Velocity: [%.2f, %.2f, %.2f]",
-                v_est(0,0), v_est(0,1), v_est(0,2));
+    // Print values (optional)
+    RCLCPP_INFO(this->get_logger(), 
+       "IMU w: [%.3f, %.3f, %.3f] (magnitude: %.3f), IMU f: [%.3f, %.3f, %.3f] (magnitude: %.3f)", 
+       imu_w.x(), imu_w.y(), imu_w.z(), w_magnitude,
+       imu_f.x(), imu_f.y(), imu_f.z(), f_magnitude);
 
-                // extract linear acceleration, remove g from z, mulitply by mass.
-    imu_f.row(0) = m * imu_accel.coeefs();
-    Eigen::Vector3d imu_angular(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
-    imu_w.row(0) = imu_angular.coeffs();
+    // // converts ROS quaternion to Eigen Quaternion
+    // Eigen::Quaterniond imu_orientation(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+    // q_est.row(0) = imu_orientation.coeffs();  // store in q_est
 
-    //(for imuw, imuf, vest, qest, pest and such)
+    // // extract linear acceleration
+    // Eigen::Vector3d imu_accel(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+
+    // // inegrate acceleration to update velocity (100hz updates, idk how fast the clock is might be cnaged later)
+    // v_est.row(0) += imu_accel.transpose() * 0.01;
+
+    // // log transformed data
+    // RCLCPP_INFO(this->get_logger(), "Updated IMU Data -> Velocity: [%.2f, %.2f, %.2f]",
+    //             v_est(0,0), v_est(0,1), v_est(0,2));
+
+    //             // extract linear acceleration, remove g from z, mulitply by mass.
+    // imu_f.row(0) = m * imu_accel.coeefs();
+    // Eigen::Vector3d imu_angular(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+    // imu_w.row(0) = imu_angular.coeffs();
+
+    // //(for imuw, imuf, vest, qest, pest and such)
 
     mainLoop( delta_t, p_est, v_est, q_est, imu_w_past, imu_f_past, p_cov); 
 
-    imu_w_past = imu_w
-    imu_f_past = imu_f
+    imu_w_past = imu_w;
+    imu_f_past = imu_f;
 
 
     //make class variables for these inputs, except delta t
     // pretty sure only imu_w and imu_f need before and after
-
-
 
 }
 
@@ -125,12 +147,12 @@ void EstimationNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
  
     if (msg->ranges.empty()) return;
 
-    //diff in time between messages
-    rclcpp::Time current_time = this->now(); // Get current ROS time
+    // //diff in time between messages
+    // rclcpp::Time current_time = this->now(); // Get current ROS time
 
 
-    double delta_t = (current_time - last_time_).nanoseconds() / 1.0e6; // Δt in milliseconds
-    last_time_ = current_time; // Update last received time
+    // double delta_t = (current_time - last_time_).nanoseconds() / 1.0e6; // Δt in milliseconds
+    // last_time_ = current_time; // Update last received time
 
     // get 1st LIDAR measurement (assume closest)?
     double angle = msg->angle_min;
@@ -219,26 +241,26 @@ void EstimationNode::MotionModel() {
           //SANIA: 
           // q.. variable only need one variable since the past variable is used to predict the next/current one
           //imuf & imu_w need past and current values.
-            Quaternion q_prev(q_est.row(k - 1));
-            Quaternion q_curr(imu_w.row(k - 1) * delta_t);
+            Quaternion q_prev(q_est);
+            Quaternion q_curr(imu_w_past * delta_t);
             Matrix3d c_ns = q_prev.to_mat();
-            Vector3d f_ns = (c_ns * imu_f.row(k - 1).transpose()) + g;
+            Vector3d f_ns = (c_ns * imu_f_past.transpose()) + g;
 
-            Vector3d p_check = p_est.row(k - 1).transpose() + delta_t * v_est.row(k - 1).transpose() +
+            Vector3d p_check = p_est.transpose() + delta_t * v_est.transpose() +
                                0.5 * delta_t * delta_t * f_ns;
-            Vector3d v_check = v_est.row(k - 1).transpose() + delta_t * f_ns;
+            Vector3d v_check = v_est.transpose() + delta_t * f_ns;
             Quaternion q_check = q_prev.quat_mult_left(q_curr);
 
             // Linearize motion model and compute Jacobians
             MatrixXd f_jac = MatrixXd::Identity(9, 9);
             f_jac.block<3, 3>(0, 3) = MatrixXd::Identity(3, 3) * delta_t;
-            f_jac.block<3, 3>(3, 6) = -skew_symmetric(c_ns * imu_f.row(k - 1).transpose()) * delta_t;
+            f_jac.block<3, 3>(3, 6) = -skew_symmetric(c_ns * imu_f_past.transpose()) * delta_t;
           // propogate uncertainty
             MatrixXd q_cov = MatrixXd::Zero(6, 6);
             q_cov.block<3, 3>(0, 0) = MatrixXd::Identity(3, 3) * delta_t * delta_t * var_imu_f;
             q_cov.block<3, 3>(3, 3) = MatrixXd::Identity(3, 3) * delta_t * delta_t * var_imu_w;
 
-            MatrixXd p_cov_check = f_jac * p_cov[k - 1] * f_jac.transpose() + l_jac * q_cov * l_jac.transpose();
+            MatrixXd p_cov_check = f_jac * p_cov * f_jac.transpose() + l_jac * q_cov * l_jac.transpose();
 
             //CORRECTION
             // think this is unecessary if we call measurement update in lasercallback
@@ -258,10 +280,10 @@ void EstimationNode::MotionModel() {
             // Update states
             //why is it check instead of hat values
             //row isn't necessary
-            p_est.row(k) = p_check.transpose();
-            v_est.row(k) = v_check.transpose();
-            q_est.row(k) = q_check.to_numpy();
-            p_cov[k] = p_cov_check;
+            p_est = p_check.transpose();
+            v_est = v_check.transpose();
+            q_est = q_check.to_numpy();
+            p_cov = p_cov_check;
         //}
 }
 

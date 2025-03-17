@@ -30,10 +30,22 @@ class EstimationNode : public rclcpp::Node {
     MatrixXd l_jac, h_jac;
 
     // State Variables
-    map<string, MatrixXd> data;
-    MatrixXd p_est, v_est, q_est, imu_w, imu_f;
-    vector<MatrixXd> p_cov;
+    // map<string, MatrixXd> data;
+    // MatrixXd p_est, v_est, q_est, imu_w, imu_f;
+    // vector<MatrixXd> p_cov;
     vector<double> gnss_t, lidar_t;
+
+    // Define IMU state variables as global variables
+    Eigen::Vector3d p_est = Eigen::Vector3d::Zero();   // Position [x, y, z]
+    Eigen::Vector3d v_est = Eigen::Vector3d::Zero();   // Velocity [vx, vy, vz]
+    Eigen::Quaterniond q_est = Eigen::Quaterniond::Identity(); // Orientation (quaternion)
+    Eigen::Matrix<double, 9, 9> p_cov = Eigen::Matrix<double, 9, 9>::Zero(); // 9x9 Position and velocity covariance matrix
+    Eigen::Vector3d imu_w = Eigen::Vector3d::Zero();   // Angular velocity [wx, wy, wz]
+    Eigen::Vector3d imu_f = Eigen::Vector3d::Zero();   // Linear acceleration [fx, fy, fz]
+
+    Eigen::Vector3d imu_w_past = Eigen::Vector3d::Zero();   // Angular velocity [wx, wy, wz]
+    Eigen::Vector3d imu_f_past = Eigen::Vector3d::Zero();   // Linear acceleration [fx, fy, fz]
+
 
     
     EstimationNode();
