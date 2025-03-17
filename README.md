@@ -3,4 +3,4 @@ q.. variable only need one variable since the past variable is used to predict t
 
 
 <br />
-imuf & imu_w need past and current values.
+imuf & imu_w need past and current values variables
