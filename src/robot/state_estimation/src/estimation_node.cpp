@@ -107,7 +107,11 @@ void EstimationNode::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
 
     //(for imuw, imuf, vest, qest, pest and such)
 
-    mainLoop( delta_t, p_est, v_est, q_est, imu_w, imu_f, p_cov); 
+    mainLoop( delta_t, p_est, v_est, q_est, imu_w_past, imu_f_past, p_cov); 
+
+    imu_w_past = imu_w
+    imu_f_past = imu_f
+
 
     //make class variables for these inputs, except delta t
     // pretty sure only imu_w and imu_f need before and after
@@ -170,6 +174,14 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
 
 
         publishMessage(p_hat, v_hat, q_hat);
+
+        //update est values here? 
+        //row not necesary
+        // p_est.row(k) = p_hat;
+        // v_est.row(k) = v_hat;
+        // q_est.row(k) = q_hat;
+        // p_cov[k] = p_cov_hat;
+        
         // i think we should return this in the publisher
         //shouldnt/why arent these values going into the "est" values after a measurement update
         return make_tuple(p_hat, v_hat, q_hat, p_cov_hat);
@@ -194,7 +206,7 @@ tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdat
 //measurement update results in updated "est" values, which uses i think distance from lidar and "check" values
 
 //where "check" values are predicted, "hat" values are corrected, "est" values are current state
-void EstimationNode::mainLoop() {
+void EstimationNode::MotionModel() {
         
         //we need two vector variables for imuw imuf vest qest pest
         //they will refect past and current, after each loop past becomes current, then we get new data
@@ -244,6 +256,7 @@ void EstimationNode::mainLoop() {
 
             // Update states
             //why is it check instead of hat values
+            //row isn't necessary
             p_est.row(k) = p_check.transpose();
             v_est.row(k) = v_check.transpose();
             q_est.row(k) = q_check.to_numpy();

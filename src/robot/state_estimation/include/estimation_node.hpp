@@ -38,7 +38,7 @@ class EstimationNode : public rclcpp::Node {
     
     EstimationNode();
 
-    void mainLoop();
+    void MotionModel();
 
     // Timer callback to publish a test message
     void publishMessage();
