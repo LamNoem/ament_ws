@@ -178,6 +178,8 @@ void EstimationNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr 
 }
 
 // Noemie: must be changed to handle actual data structure from inputs
+// getting accurate corrected positions from lidar requires an algorithm that resembles slam, point cloud etc..
+//which makes this redundant and not worth implementing
 tuple<Vector3d, Vector3d, Quaternion, MatrixXd> EstimationNode::measurementUpdate(
         double sensor_var, const MatrixXd &p_cov_check, const Vector3d &y_k,
         const Vector3d &p_check, const Vector3d &v_check, const Quaternion &q_check) {
