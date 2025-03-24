@@ -297,7 +297,7 @@ void EstimationNode::publishMessage(const Eigen::Vector3d &p_est, const Eigen::V
 
   // Set timestamp and frame ID
   message.header.stamp = this->get_clock()->now();
-  message.header.frame_id = "odom";  // Change "map" to your relevant frame
+  message.header.frame_id = "map";  // Change "map" to your relevant frame
 
   // Populate position
   message.pose.pose.position.x = p_est.x();
