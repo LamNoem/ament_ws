@@ -291,31 +291,34 @@ void EstimationNode::MotionModel() {
 
 
 
-// Define the timer to publish a message every 500ms
-void EstimationNode::publishMessage() {
-  auto message = std_msgs::msg::String();
-  message.data = "Hello, ROS 2!";
-  RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-  string_pub_->publish(message);
-}
-
 //not sure this'll work its just a first try
-void EstimationNode::publishMessage(const Vector3d &p_hat, const Vector3d &v_hat, const Quaternion &q_hat) {
+void EstimationNode::publishMessage(const Eigen::Vector3d &p_est, const Eigen::Vector3d &v_est, const Eigen::Quaterniond &q_est) {
   auto message = nav_msgs::msg::Odometry();
-  
-  message.pose.pose.position.x = p_hat.x();
-  message.pose.pose.position.y = p_hat.y();
-  message.pose.pose.position.z = p_hat.z();
 
-  message.pose.pose.orientation.x = q_hat.x;
-  message.pose.pose.orientation.y = q_hat.y;
-  message.pose.pose.orientation.z = q_hat.z;
-  message.pose.pose.orientation.w = q_hat.w;
+  // Set timestamp and frame ID
+  message.header.stamp = this->get_clock()->now();
+  message.header.frame_id = "odom";  // Change "map" to your relevant frame
 
-  message.twist.twist.linear.x = v_hat.x();
-  message.twist.twist.linear.y = v_hat.y();
-  message.twist.twist.linear.z = v_hat.z();
-  
+  // Populate position
+  message.pose.pose.position.x = p_est.x();
+  message.pose.pose.position.y = p_est.y();
+  message.pose.pose.position.z = p_est.z();
+
+  // Populate orientation (ensure correct Eigen access)
+  message.pose.pose.orientation.x = q_est.x();
+  message.pose.pose.orientation.y = q_est.y();
+  message.pose.pose.orientation.z = q_est.z();
+  message.pose.pose.orientation.w = q_est.w();
+
+  // Populate velocity
+  message.twist.twist.linear.x = v_est.x();
+  message.twist.twist.linear.y = v_est.y();
+  message.twist.twist.linear.z = v_est.z();
+
+  // Optionally, set covariance matrices (identity matrix as placeholder)
+  message.pose.covariance.fill(0.0);
+  message.twist.covariance.fill(0.0);
+
   RCLCPP_INFO(this->get_logger(), "Publishing estimation data (Pose & Velocity).");
   estimation_pub_->publish(message);
 }
